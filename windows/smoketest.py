@@ -54,6 +54,12 @@ def run():
     print(len(df), "transaksjoner,", len(p["faste"]), "faste utgifter i planen")
     assert len(df) > 100 and p["inntekter"], "for lite data"
 
+    step("Leter etter Claude uten å krasje")
+    from forbruk import ai_categorize, claude_connect
+    print("Claude-appen funnet:", claude_connect.desktop_installed(), "| config:", claude_connect.desktop_config_path())
+    print("claude-kommando:", ai_categorize.find_claude_cli())
+    print("MCP-oppføring:", claude_connect.server_entry())
+
     step("Forsiden i appen kjører uten feil")
     from streamlit.testing.v1 import AppTest
     at = AppTest.from_file(str(APP / "app.py"), default_timeout=180).run()

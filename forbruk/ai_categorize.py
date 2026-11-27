@@ -134,7 +134,16 @@ def find_claude_cli() -> str | None:
                   Path("/opt/homebrew/bin/claude"), Path("/usr/local/bin/claude")]
     candidates += [Path(p) for p in sorted(glob.glob(str(
         home / "Library/Application Support/Claude/claude-code/*/*/claude.app/Contents/MacOS/claude")), reverse=True)]
-    candidates += [Path(p) for p in glob.glob(os.path.expandvars(r"%APPDATA%\Claude\claude-code\*\claude.exe"))]
+    if os.name == "nt":
+        appdata = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
+        local = Path(os.environ.get("LOCALAPPDATA", home / "AppData" / "Local"))
+        candidates += [home / ".local" / "bin" / "claude.exe", home / ".claude" / "local" / "claude.exe",
+                       appdata / "npm" / "claude.cmd", local / "Programs" / "claude" / "claude.exe"]
+        # Claude Code som følger med Claude-appen (vanlig installasjon og Microsoft Store-pakke)
+        for base in [appdata / "Claude", *local.glob("Packages/Claude_*/LocalCache/Roaming/Claude"),
+                     *local.glob("Packages/AnthropicPBC.Claude*/LocalCache/Roaming/Claude")]:
+            candidates += [Path(p) for p in sorted(glob.glob(str(base / "claude-code" / "**" / "claude.exe"),
+                                                             recursive=True), reverse=True)]
     for c in candidates:
         if c.is_file() and os.access(c, os.X_OK):
             return str(c)
@@ -192,7 +201,8 @@ def _via_claude_code(items: list[Item]) -> dict[str, dict]:
         # Kjør i en tom mappe, så Claude ikke ser andre filer
         with tempfile.TemporaryDirectory() as tmp:
             try:
-                p = subprocess.run(cmd, input=_prompt(items), capture_output=True, text=True, cwd=tmp, timeout=240)
+                p = subprocess.run(cmd, input=_prompt(items), capture_output=True, text=True, encoding="utf-8",
+                                   cwd=tmp, timeout=240, creationflags=0x08000000 if os.name == "nt" else 0)
             except subprocess.TimeoutExpired as e:
                 raise RuntimeError("Claude brukte for lang tid. Prøv igjen.") from e
         try:
