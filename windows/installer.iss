@@ -1,4 +1,4 @@
-; Installasjonsfil for Windows (Inno Setup 6). Bygges av .github/workflows/windows.yml.
+﻿; Installasjonsfil for Windows (Inno Setup 6). Bygges av .github/workflows/windows.yml.
 ; Installerer uten administrator-passord, lager ikon på skrivebordet og i Start-menyen,
 ; og åpner appen når installasjonen er ferdig.
 
@@ -6,8 +6,6 @@
   #define AppVersion "1.0.0"
 #endif
 #define AppName "Pengene mine"
-#define Launch "{app}\python\pythonw.exe"
-#define LaunchArgs """{app}\app\launcher.py"""
 
 [Setup]
 AppId={{8F3C2A51-6B7D-4E0A-9C1E-5A2D7B9F4E10}
@@ -46,11 +44,11 @@ Type: filesandordirs; Name: "{app}\python"
 Source: "..\build\PengeneMine\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{autodesktop}\{#AppName}"; Filename: "{#Launch}"; Parameters: "{#LaunchArgs}"; WorkingDir: "{app}\app"; IconFilename: "{app}\app\windows\ikon.ico"
-Name: "{autoprograms}\{#AppName}"; Filename: "{#Launch}"; Parameters: "{#LaunchArgs}"; WorkingDir: "{app}\app"; IconFilename: "{app}\app\windows\ikon.ico"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: """{app}\app\launcher.py"""; WorkingDir: "{app}\app"; IconFilename: "{app}\app\windows\ikon.ico"
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: """{app}\app\launcher.py"""; WorkingDir: "{app}\app"; IconFilename: "{app}\app\windows\ikon.ico"
 
 [Run]
-Filename: "{#Launch}"; Parameters: "{#LaunchArgs}"; WorkingDir: "{app}\app"; Description: "Åpne {#AppName} nå"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\python\pythonw.exe"; Parameters: """{app}\app\launcher.py"""; WorkingDir: "{app}\app"; Description: "Åpne {#AppName} nå"; Flags: postinstall nowait skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
