@@ -115,7 +115,9 @@ def complete_periods(df: pd.DataFrame, n: int | None = None) -> list[str]:
 # ---------------------------------------------------------------- grunnlag
 def spending(df: pd.DataFrame) -> pd.DataFrame:
     """Forbruk: utgiftskategorier, uten overføringer. Refusjoner (+) trekkes fra."""
-    s = df[(~df["is_transfer"]) & (df["category"].isin(EXPENSE_SET))].copy()
+    s = df[(~df["is_transfer"]) & (df["category"].isin(EXPENSE_SET))]
+    # Penger inn i «Annet»/«Ukategorisert» er ikke refusjoner – de skal ikke gi minus-forbruk
+    s = s[~((s["amount"] > 0) & s["category"].isin({"Annet", "Ukategorisert"}))].copy()
     s["spend"] = -s["amount"]
     return s
 

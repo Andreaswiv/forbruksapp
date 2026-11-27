@@ -100,9 +100,17 @@ def find_subscriptions(df: pd.DataFrame, reference_date: pd.Timestamp | None = N
     out["mkey"] = out["text"].map(merchant_key)
     out["abs"] = out["amount"].abs()
     subs: list[Subscription] = []
+    from .anonymize import Anonymizer, contains_person, is_private_person
+    anon = Anonymizer()
 
     for mkey, g in out.groupby("mkey"):
         if len(g) < 2:
+            continue
+        # Betalinger til privatpersoner (Vipps til venner o.l.) er ikke abonnementer –
+        # bortsett fra husleie til en privat utleier
+        cat, text = g["category"].iloc[-1], g["text"].iloc[-1]
+        if (cat == "Vipps" and contains_person(anon.anonymize(text))) or \
+                (cat not in {"Bolig", "Abonnementer"} and is_private_person(text)):
             continue
         labels = _cluster_amounts(g["abs"].to_numpy())
         for lbl in np.unique(labels):
