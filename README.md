@@ -37,7 +37,7 @@ Vil du teste uten egne data, trykk **Prøv med eksempeldata** på forsiden. Ekse
 | Hjem | Brukt, fått inn, spart og igjen denne måneden, hvor pengene gikk, tre tips og utviklingen måned for måned |
 | Pengene mine | Kategorier som smultring og liste, og alle kjøp. Trykk på en kategori for å endre den |
 | Abonnementer | Hva du betaler i måneden og året, prisøkninger, overlapp (f.eks. tre strømmetjenester) og «Beholde / Usikker / Si opp» med utregnet besparelse |
-| Budsjett | Ett trykk lager et budsjett ut fra vanene dine. Viser hva som er igjen per kategori (grønn, oransje, rød). Kan endres og lastes ned som Excel |
+| Budsjett | **📝 Planlegg** neste (eller denne) måned i fem steg: hva du får inn, faste utgifter (funnet automatisk), egne planer (bursdag, konsert …), hvor mye du vil spare, og forslag til resten. Forslaget kutter mest i «ønsker» hvis pengene ikke strekker til. **📊 Slik går det** viser planen mot det du faktisk har brukt, og hvor mye du kan bruke per dag. Kan lastes ned som Excel |
 | Innsikt | Sparetips, sammenligning med SIFO for noen på din alder, «hva om»-spaker, prognose fram til lønning og månedsrapport som PDF |
 | Last opp | Slipp filer fra DNB, Nordea, SpareBank 1, Sbanken, Bulder m.fl. Kolonnene kjennes igjen automatisk |
 | Innstillinger | Navnet ditt, kontoer (en sparekonto teller som sparing), opplastede filer, kalendermåned eller lønn til lønn, det du har lært appen, AI av/på og **slett alle data** |
@@ -116,7 +116,8 @@ forbruk/
   subscriptions.py         Abonnementsjeger
   analysis.py              Perioder, oppsummering, avvik, hva om, prognose, tullball-detektor
   sifo.py                  SIFO-sammenligning
-  budget.py                Budsjettforslag, oppfølging, felles økonomi, Excel-eksport
+  budget.py                Oppfølging mot budsjett, felles økonomi, Excel-eksport
+  plan.py                  Månedsplan: inntekt, faste utgifter, egne planer, sparing og forslag til resten
   report.py                PDF-rapport
   ai_categorize.py         AI-hjelp med Claude (av som standard)
   anonymize.py             Anonymisering av navn og tall før noe sendes
