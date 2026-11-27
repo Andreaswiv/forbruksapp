@@ -160,12 +160,15 @@ def all_rules(conn) -> list[Rule]:
 
 def match_category(text: str, amount: float, rules: list[Rule]) -> str | None:
     t = db.normalize_text(text)
+    # Samme tekst uten tegn som «*» og «_», så «nyx*studentsamskipnaden» treffer regelen «nyx studentsamskipnaden»
+    loose = " ".join(re.sub(r"[^a-z0-9æøåäöéü&+' ]", " ", t).split())
     best: Rule | None = None
     for r in rules:
         if r.sign == "+" and amount < 0 or r.sign == "-" and amount > 0:
             continue
         try:
-            if not compile_pattern(r.pattern).search(t):
+            rx = compile_pattern(r.pattern)
+            if not (rx.search(t) or rx.search(loose)):
                 continue
         except re.error:
             continue
@@ -200,6 +203,10 @@ _CLEANERS = [
 _CLEAN_RE = [re.compile(c) for c in _CLEANERS]
 
 
+# Betalingsløsninger der det egentlige stedet står etter («Vipps*Foodora», «Zettle_*Paint On Pots»)
+TERMINALS = {"vipps", "mobilepay", "zettle", "izettle", "sumup", "nyx", "sq", "square", "paypal", "klarna"}
+
+
 def merchant_key(text: str) -> str:
     t = db.normalize_text(text)
     for rx in _CLEAN_RE:
@@ -208,8 +215,14 @@ def merchant_key(text: str) -> str:
     words = [w for w in t.split() if w not in {"as", "asa", "ab", "ltd", "inc", "no", "nor", "oslo", "com", "bill", "www", "nok"}]
     if not words:
         return db.normalize_text(text)[:30] or "ukjent"
-    n = 3 if words[0] in {"vipps", "mobilepay"} else 2
-    return " ".join(words[:n])
+    if words[0] in TERMINALS and len(words) > 1:
+        return " ".join(words[:3])
+    # «Småsparing 1», «Småsparing 2» … og «Point a282» er samme sted: dropp løpenummer på slutten
+    #  («Rema 1000» beholdes – tall med tre sifre eller mer er en del av navnet)
+    if len(words) > 1 and len(words[0]) >= 4 and re.search(r"\d", words[1]) \
+            and not re.fullmatch(r"\d{3,}", words[1]):
+        return words[0]
+    return " ".join(words[:2])
 
 
 def merchant_label(key: str) -> str:
@@ -268,11 +281,26 @@ def set_manual_category(conn, tx_id: int, category: str) -> None:
     db.update_transaction(conn, tx_id, category=category, category_source="manual")
 
 
+def own_name_patterns(name: str | None) -> list[re.Pattern]:
+    """Mønstre for brukerens fulle navn, også med etternavn først («Hansen Emma»).
+
+    Krever minst fornavn + etternavn, ellers blir det for mange falske treff
+    (en venn med samme fornavn er ikke deg).
+    """
+    words = db.normalize_text(name or "").replace(",", " ").split()
+    if len(words) < 2:
+        return []
+    variants = {" ".join(words), f"{words[-1]} {' '.join(words[:-1])}", f"{words[0]} {words[-1]}"}
+    return [compile_pattern(v) for v in variants]
+
+
 def detect_transfers(conn, max_days: int = 3) -> int:
     """Markerer overføringer mellom egne kontoer.
 
     1) Tekst som tydelig sier «egen konto» o.l.
     2) Teksten inneholder kontonummeret til en av dine egne kontoer.
+    2b) Teksten inneholder navnet ditt (f.eks. «Overføring fra Emma Hansen» eller
+        «Vipps*Emma Hansen») – da flytter du penger mellom dine egne kontoer.
     3) Par: samme beløp ut fra én av dine kontoer og inn på en annen av dine kontoer
        innen `max_days` dager (kontoene må ha samme eier).
     Transaksjoner du har satt manuelt, røres ikke.
@@ -287,11 +315,15 @@ def detect_transfers(conn, max_days: int = 3) -> int:
     own_numbers = [re.sub(r"\D", "", n or "") for (n,) in
                    conn.execute("SELECT account_number FROM accounts").fetchall()]
     own_numbers = [n for n in own_numbers if len(n) >= 8]
+    name_patterns = own_name_patterns(db.get_setting(conn, "user_name", ""))
 
     flagged: set[int] = set()
     for r in auto.itertuples():
         t = db.normalize_text(r.text)
         if any(p in t for p in TRANSFER_PATTERNS):
+            flagged.add(r.id)
+            continue
+        if name_patterns and "lønn" not in t and any(p.search(t) for p in name_patterns):
             flagged.add(r.id)
             continue
         digits = re.sub(r"\D", "", r.text)
