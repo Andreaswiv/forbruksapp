@@ -127,3 +127,17 @@ data/sifo_satser.json      Offisielle SIFO-satser 2026
 eksempeldata/              Falske kontoutskrifter i fire filer og tre bankformater
 tests/                     pytest
 ```
+
+## Windows-program (for de som ikke vil installere noe selv)
+
+Appen kan pakkes som et vanlig Windows-program med ikon på skrivebordet. Python følger med,
+så mottakeren trenger ingenting fra før – bare laste ned og dobbeltklikke.
+
+- **Bygg:** GitHub → *Actions* → *Windows-installer* → *Run workflow*. Etter ca. 10 minutter
+  ligger `PengeneMine-installer.exe` under *Artifacts*.
+- **Ny versjon med nedlastingslenke:** `git tag v1.0.0 && git push origin v1.0.0` – da legges filen også ut
+  under *Releases*.
+- Installeres uten administratorpassord i `%LOCALAPPDATA%\Programs\Pengene mine`. Ikonet åpner appen i
+  eget vindu (Edge i app-modus), og appen stopper når vinduet lukkes.
+- Dataene ligger i `%USERPROFILE%\.forbruksapp` og blir værende ved oppdatering og avinstallering.
+- Filene ligger i `windows/` (bygg, installer, ikon, røyktest) og `launcher.py`.
