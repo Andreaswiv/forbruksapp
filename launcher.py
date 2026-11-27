@@ -69,13 +69,14 @@ def python_for_server() -> str:
 
 def start_server() -> tuple[subprocess.Popen, int]:
     port = free_port()
-    cmd = [python_for_server(), "-m", "streamlit", "run", str(HERE / "app.py"),
+    # -X utf8: æøå fungerer likt overalt (den innebygde Python-en på Windows ignorerer PYTHONUTF8)
+    cmd = [python_for_server(), "-X", "utf8", "-m", "streamlit", "run", str(HERE / "app.py"),
            "--server.port", str(port), "--server.address", "127.0.0.1", "--server.headless", "true",
            "--browser.gatherUsageStats", "false", "--global.developmentMode", "false",
            "--server.fileWatcherType", "none", "--server.runOnSave", "false"]
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     out = (DATA_DIR / "server.log").open("w", encoding="utf-8")
-    env = dict(os.environ, PYTHONUTF8="1")   # æøå i filer og tekst fungerer likt på Windows og Mac
+    env = dict(os.environ, PYTHONUTF8="1")
     proc = subprocess.Popen(cmd, cwd=HERE, stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                             creationflags=NO_WINDOW, env=env)
     log(f"startet server pid={proc.pid} port={port}")
