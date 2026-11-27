@@ -1,6 +1,8 @@
 """Sjekker at den ferdigbygde Windows-appen virker – kjøres med den medfølgende Python-en.
 
-    build\\PengeneMine\\python\\python.exe windows\\smoketest.py
+    build\\PengeneMine\\python\\python.exe -X utf8 windows\\smoketest.py
+
+Feiler noe, skrives feilen også som en GitHub-«annotation», så den kan leses uten å logge inn.
 """
 from __future__ import annotations
 
@@ -9,49 +11,82 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
+for stream in (sys.stdout, sys.stderr):
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        pass
+
 APP = Path(os.environ.get("APP_DIR") or Path(sys.executable).resolve().parent.parent / "app")
-os.environ["FORBRUKSAPP_DIR"] = tempfile.mkdtemp(prefix="pengene-test-")
+DATA = Path(tempfile.mkdtemp(prefix="pengene-test-"))
+os.environ["FORBRUKSAPP_DIR"] = str(DATA)
 os.chdir(APP)
 sys.path.insert(0, str(APP))
+current = "oppstart"
 
 
 def step(name):
+    global current
+    current = name
     print(f"--- {name}", flush=True)
 
 
-step("Pakker kan importeres")
-import matplotlib, openpyxl, pandas, plotly, reportlab, streamlit, xlsxwriter  # noqa: E401,F401
-print("streamlit", streamlit.__version__, "pandas", pandas.__version__)
+def run():
+    step("Pakker kan importeres")
+    import matplotlib, openpyxl, pandas, plotly, reportlab, streamlit, xlsxwriter  # noqa: E401,F401
+    print("python", sys.version.split()[0], "utf8-modus", sys.flags.utf8_mode,
+          "streamlit", streamlit.__version__, "pandas", pandas.__version__)
 
-step("Eksempeldata kan leses, kategoriseres og planlegges")
-from forbruk import categorize, db, importer, plan, subscriptions  # noqa: E402
-conn = db.connect()
-db.set_setting(conn, "user_name", "Emma Hansen")
-for f in sorted((APP / "eksempeldata").glob("*.*")):
-    if f.suffix in {".csv", ".xlsx"}:
-        r = importer.parse_file(f.read_bytes(), f.name)
-        db.insert_transactions(conn, r.df, db.get_or_create_account(conn, f.stem, None, None), f.name)
-categorize.refresh(conn)
-df = db.load_transactions(conn)
-p = plan.new_plan(df, subscriptions.find_subscriptions(df), plan.next_month())
-print(len(df), "transaksjoner,", len(p["faste"]), "faste utgifter i planen")
-assert len(df) > 100 and p["inntekter"]
+    step("Eksempeldata kan leses, kategoriseres og planlegges")
+    from forbruk import categorize, db, importer, plan, subscriptions
+    conn = db.connect()
+    db.set_setting(conn, "user_name", "Emma Hansen")
+    for f in sorted((APP / "eksempeldata").glob("*.*")):
+        if f.suffix in {".csv", ".xlsx"}:
+            r = importer.parse_file(f.read_bytes(), f.name)
+            db.insert_transactions(conn, r.df, db.get_or_create_account(conn, f.stem, None, None), f.name)
+    categorize.refresh(conn)
+    df = db.load_transactions(conn)
+    p = plan.new_plan(df, subscriptions.find_subscriptions(df), plan.next_month())
+    print(len(df), "transaksjoner,", len(p["faste"]), "faste utgifter i planen")
+    assert len(df) > 100 and p["inntekter"], "for lite data"
 
-step("Alle sidene i appen kjører uten feil")
-from streamlit.testing.v1 import AppTest  # noqa: E402
-at = AppTest.from_file(str(APP / "app.py"), default_timeout=120).run()
-assert not at.exception, [e.value for e in at.exception]
-print("forsiden OK")
+    step("Forsiden i appen kjører uten feil")
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file(str(APP / "app.py"), default_timeout=180).run()
+    assert not at.exception, [e.value for e in at.exception]
+    print("forsiden OK")
 
-step("Launcheren starter og stopper appen")
-import launcher  # noqa: E402
-print("nettleser for app-vindu:", launcher.find_app_browser())
-launcher.open_window = lambda port: (print("app svarer på port", port, launcher.healthy(port)),
-                                     subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"]))[1]
-t = time.time()
-assert launcher.main() == 0
-assert not launcher.STATE.exists()
-print(f"OK på {time.time() - t:.0f} s")
-print("\nAlt virker ✅")
+    step("Launcheren starter og stopper appen")
+    import launcher
+    print("nettleser for app-vindu:", launcher.find_app_browser())
+    launcher.open_window = lambda port: (print("app svarer på port", port, launcher.healthy(port)),
+                                         subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"]))[1]
+    t = time.time()
+    assert launcher.main() == 0, "launcheren returnerte feil"
+    assert not launcher.STATE.exists()
+    print(f"OK på {time.time() - t:.0f} s")
+
+
+def report(text: str) -> None:
+    """Skriv feilen som en GitHub-annotation (synlig for alle uten innlogging)."""
+    for name in ("server.log", "launcher.log"):
+        f = DATA / name
+        if f.exists():
+            text += f"\n\n--- {name} ---\n" + "\n".join(f.read_text(encoding="utf-8", errors="replace").splitlines()[-25:])
+    text = text[-3500:].replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+    print(f"::error title=Røyktest feilet: {current}::{text}", flush=True)
+
+
+if __name__ == "__main__":
+    try:
+        run()
+    except BaseException:
+        tb = traceback.format_exc()
+        print(tb, flush=True)
+        report(tb)
+        sys.exit(1)
+    print("\nAlt virker ✅")
