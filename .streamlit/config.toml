@@ -1,0 +1,15 @@
+[browser]
+# Ingen bruksstatistikk sendes til Streamlit/Snowflake
+gatherUsageStats = false
+
+[server]
+# Kun tilgjengelig fra denne maskinen
+address = "localhost"
+headless = true
+
+[theme]
+base = "light"
+primaryColor = "#2563eb"
+
+[client]
+toolbarMode = "minimal"

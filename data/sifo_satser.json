@@ -1,0 +1,83 @@
+{
+  "_LES_MEG": "Offisielle tall fra SIFOs referansebudsjett for forbruksutgifter 2026 (OsloMet), regnearket Referansebudsjettet_2026_Norsk.xlsx, fanene «Individspes. utgifter 2026» og «Husholdsspes. utgifter 2026». Kroner per måned, prisnivå februar 2026. Hver post har egne alders-/kjønnsgrupper slik SIFO deler dem inn. kjønn: «alle», «kvinne» (K/J) eller «mann» (M/G). Alder i hele år, til og med alder_til.",
+  "år": 2026,
+  "eksempeltall": false,
+  "kilde": "SIFO-rapport 9-2026, SIFOs referansebudsjett for forbruksutgifter 2026 (Alecu og Ansteensen), https://hdl.handle.net/11250/5517284",
+  "merknader": [
+    "Mat og drikke for barn under 1 år: SIFO skiller mellom 0–5 mnd (1 065 kr) og 6–11 mnd (2 500 kr). Appen bruker 6–11 mnd for alder 0.",
+    "Reisekostnader er 30-dagersbillett Ruter (Oslo). SIFO har egen studentsats 20–29 år: 612 kr. Barn 6–19 år regnes med barnebillett (338 kr), selv om SIFOs eksempelfamilie bare tar med de voksnes billetter.",
+    "Spedbarnsutstyr (grunnutrustning 3 980 kr / supplering 535 kr) og barnehage/SFO er ikke tatt med.",
+    "Husholdningsartikler og møbler regnes etter antall personer fra 3 år."
+  ],
+  "individ": {
+    "Mat og drikke": [
+      {"alder_fra": 0,  "alder_til": 0,   "kjønn": "alle",   "beløp": 2500},
+      {"alder_fra": 1,  "alder_til": 3,   "kjønn": "alle",   "beløp": 2180},
+      {"alder_fra": 4,  "alder_til": 6,   "kjønn": "alle",   "beløp": 2585},
+      {"alder_fra": 7,  "alder_til": 10,  "kjønn": "alle",   "beløp": 3190},
+      {"alder_fra": 11, "alder_til": 14,  "kjønn": "kvinne", "beløp": 3750},
+      {"alder_fra": 11, "alder_til": 14,  "kjønn": "mann",   "beløp": 3840},
+      {"alder_fra": 15, "alder_til": 17,  "kjønn": "kvinne", "beløp": 4120},
+      {"alder_fra": 15, "alder_til": 17,  "kjønn": "mann",   "beløp": 4640},
+      {"alder_fra": 18, "alder_til": 24,  "kjønn": "kvinne", "beløp": 4445},
+      {"alder_fra": 25, "alder_til": 50,  "kjønn": "kvinne", "beløp": 4280},
+      {"alder_fra": 51, "alder_til": 70,  "kjønn": "kvinne", "beløp": 3900},
+      {"alder_fra": 71, "alder_til": 120, "kjønn": "kvinne", "beløp": 3915},
+      {"alder_fra": 18, "alder_til": 24,  "kjønn": "mann",   "beløp": 4945},
+      {"alder_fra": 25, "alder_til": 50,  "kjønn": "mann",   "beløp": 4760},
+      {"alder_fra": 51, "alder_til": 70,  "kjønn": "mann",   "beløp": 4355},
+      {"alder_fra": 71, "alder_til": 120, "kjønn": "mann",   "beløp": 4290}
+    ],
+    "Klær og sko": [
+      {"alder_fra": 0,  "alder_til": 0,   "kjønn": "alle",   "beløp": 730},
+      {"alder_fra": 1,  "alder_til": 1,   "kjønn": "alle",   "beløp": 1140},
+      {"alder_fra": 2,  "alder_til": 5,   "kjønn": "alle",   "beløp": 900},
+      {"alder_fra": 6,  "alder_til": 9,   "kjønn": "alle",   "beløp": 1010},
+      {"alder_fra": 10, "alder_til": 13,  "kjønn": "kvinne", "beløp": 880},
+      {"alder_fra": 10, "alder_til": 13,  "kjønn": "mann",   "beløp": 860},
+      {"alder_fra": 14, "alder_til": 17,  "kjønn": "kvinne", "beløp": 1030},
+      {"alder_fra": 14, "alder_til": 17,  "kjønn": "mann",   "beløp": 1010},
+      {"alder_fra": 18, "alder_til": 120, "kjønn": "kvinne", "beløp": 1090},
+      {"alder_fra": 18, "alder_til": 120, "kjønn": "mann",   "beløp": 1120}
+    ],
+    "Personlig pleie": [
+      {"alder_fra": 0,  "alder_til": 0,   "kjønn": "alle",   "beløp": 530},
+      {"alder_fra": 1,  "alder_til": 2,   "kjønn": "alle",   "beløp": 630},
+      {"alder_fra": 3,  "alder_til": 3,   "kjønn": "alle",   "beløp": 370},
+      {"alder_fra": 4,  "alder_til": 5,   "kjønn": "alle",   "beløp": 240},
+      {"alder_fra": 6,  "alder_til": 9,   "kjønn": "alle",   "beløp": 270},
+      {"alder_fra": 10, "alder_til": 13,  "kjønn": "kvinne", "beløp": 520},
+      {"alder_fra": 10, "alder_til": 13,  "kjønn": "mann",   "beløp": 380},
+      {"alder_fra": 14, "alder_til": 17,  "kjønn": "kvinne", "beløp": 630},
+      {"alder_fra": 14, "alder_til": 17,  "kjønn": "mann",   "beløp": 510},
+      {"alder_fra": 18, "alder_til": 50,  "kjønn": "kvinne", "beløp": 1020},
+      {"alder_fra": 51, "alder_til": 120, "kjønn": "kvinne", "beløp": 980},
+      {"alder_fra": 18, "alder_til": 120, "kjønn": "mann",   "beløp": 820}
+    ],
+    "Lek, sport og mediebruk": [
+      {"alder_fra": 0,  "alder_til": 0,   "kjønn": "alle", "beløp": 160},
+      {"alder_fra": 1,  "alder_til": 2,   "kjønn": "alle", "beløp": 390},
+      {"alder_fra": 3,  "alder_til": 5,   "kjønn": "alle", "beløp": 810},
+      {"alder_fra": 6,  "alder_til": 9,   "kjønn": "alle", "beløp": 1260},
+      {"alder_fra": 10, "alder_til": 13,  "kjønn": "alle", "beløp": 1570},
+      {"alder_fra": 14, "alder_til": 17,  "kjønn": "alle", "beløp": 1690},
+      {"alder_fra": 18, "alder_til": 120, "kjønn": "alle", "beløp": 1080}
+    ],
+    "Reisekostnader": [
+      {"alder_fra": 0,  "alder_til": 5,   "kjønn": "alle", "beløp": 0},
+      {"alder_fra": 6,  "alder_til": 19,  "kjønn": "alle", "beløp": 338},
+      {"alder_fra": 20, "alder_til": 66,  "kjønn": "alle", "beløp": 1019},
+      {"alder_fra": 67, "alder_til": 120, "kjønn": "alle", "beløp": 510}
+    ]
+  },
+  "husholdning": {
+    "Andre dagligvarer":    {"telles_fra_alder": 0, "per_antall": {"1": 400,  "2": 450,  "3": 630,  "4": 760,  "5": 940,  "6": 1050, "7": 1120}},
+    "Husholdningsartikler": {"telles_fra_alder": 3, "per_antall": {"1": 590,  "2": 640,  "3": 725,  "4": 920,  "5": 995,  "6": 1075, "7": 1145}},
+    "Møbler":               {"telles_fra_alder": 3, "per_antall": {"1": 550,  "2": 680,  "3": 870,  "4": 990,  "5": 1210, "6": 1430, "7": 1630}},
+    "Mediebruk og fritid":  {"telles_fra_alder": 0, "per_antall": {"1": 2570, "2": 2620, "3": 2760, "4": 2850, "5": 2880, "6": 2910, "7": 2910}}
+  },
+  "bil": {
+    "bensin": {"1-4": 3375, "5-7": 5105},
+    "el":     {"1-4": 2245, "5-7": 3085}
+  }
+}
