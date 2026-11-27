@@ -75,3 +75,26 @@ def test_transfer_pairs_between_own_accounts(conn):
     assert bool(df.loc["Nettbank overført", "is_transfer"])
     assert bool(df.loc["Innskudd", "is_transfer"])
     assert not bool(df.loc["Kiwi", "is_transfer"])     # bare ett par per overføring
+
+
+def test_own_name_patterns_need_full_name():
+    assert categorize.own_name_patterns("Emma") == []
+    assert categorize.own_name_patterns("") == []
+    assert len(categorize.own_name_patterns("Emma  Hansen")) >= 2
+
+
+def test_transfers_detected_by_own_name(conn):
+    db.set_setting(conn, "user_name", "Emma Hansen")
+    aid = db.get_or_create_account(conn, "Brukskonto", "DNB", None)
+    df = pd.DataFrame({"date": ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"],
+                       "text": ["Overføring til Emma Hansen", "Fra: Emma Hansen", "Hansen Emma",
+                                "Vipps*Emma Olsen", "Lønn Emma Hansen"],
+                       "amount": [-1500.0, 800.0, -200.0, -150.0, 14500.0]})
+    db.insert_transactions(conn, df, aid, "t.csv")
+    categorize.refresh(conn)
+    flags = dict(conn.execute("SELECT text, is_transfer FROM transactions").fetchall())
+    assert flags["Overføring til Emma Hansen"] == 1
+    assert flags["Fra: Emma Hansen"] == 1
+    assert flags["Hansen Emma"] == 1
+    assert flags["Vipps*Emma Olsen"] == 0        # en venn med samme fornavn
+    assert flags["Lønn Emma Hansen"] == 0        # lønn er inntekt, ikke overføring

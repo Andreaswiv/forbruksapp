@@ -16,6 +16,8 @@ EXPENSE_SET = set(EXPENSE_CATEGORIES)
 # ---------------------------------------------------------------- perioder
 def detect_payday(df: pd.DataFrame) -> int | None:
     sal = df[(df["category"] == "Lønn") & (df["amount"] > 0)]
+    if "owner" in sal.columns and (sal["owner"] == "meg").any():
+        sal = sal[sal["owner"] == "meg"]          # din lønn, ikke partnerens
     if sal.empty:
         return None
     biggest = sal.loc[sal.groupby(sal["date"].dt.to_period("M"))["amount"].idxmax()]
@@ -24,6 +26,8 @@ def detect_payday(df: pd.DataFrame) -> int | None:
 
 def _salary_dates(df: pd.DataFrame) -> list[pd.Timestamp]:
     sal = df[(df["category"] == "Lønn") & (df["amount"] > 0)]
+    if "owner" in sal.columns and (sal["owner"] == "meg").any():
+        sal = sal[sal["owner"] == "meg"]          # din lønn, ikke partnerens
     if sal.empty:
         return []
     biggest = sal.loc[sal.groupby(sal["date"].dt.to_period("M"))["amount"].idxmax()]

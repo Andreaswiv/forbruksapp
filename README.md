@@ -21,39 +21,59 @@ python3 -m venv .venv
 .venv/bin/streamlit run app.py
 ```
 
-Vil du teste uten egne data, trykk **Last inn eksempeldata** på forsiden. Eksempelfilene ligger i `eksempeldata/`, og du lager dem på nytt med `python eksempeldata/lag_eksempeldata.py`.
+Vil du teste uten egne data, trykk **Prøv med eksempeldata** på forsiden. Eksempeldataene er en 20 år gammel student («Emma Hansen») med deltidsjobb, stipend fra Lånekassen og en del abonnementer. Filene ligger i `eksempeldata/`, og du lager dem på nytt med `python eksempeldata/lag_eksempeldata.py`.
 
 ## Slik bruker du den
 
-1. **Last ned transaksjoner** fra nettbanken (CSV eller Excel), gjerne flere måneder om gangen.
-2. **Last opp** filene og velg hvilken konto de hører til. Opprett kontoen første gang. Legg inn kontonummeret, så kjenner appen igjen overføringer mellom egne kontoer.
-3. Gå til **Kategorier og regler → Ukategorisert** og gi de ukjente butikkene en kategori. Reglene huskes til neste gang.
-4. Se på **Oversikt**, **Abonnementer**, **Tullball og prognoser**, **SIFO** og **Budsjett**.
-5. Last opp en ny fil hver måned. Overlappende perioder er ikke noe problem, fordi duplikater hoppes over.
+1. **Skriv navnet ditt** (fullt navn, slik det står i banken). Da forstår appen at «Overføring til Emma Hansen» eller «Fra: Emma Hansen» er deg som flytter penger mellom egne kontoer, og ikke forbruk eller inntekt. Bare fornavn er ikke nok, fordi en venn med samme fornavn da kunne blitt tolket som deg.
+2. **Last opp** kontoutskriften fra nettbanken (CSV eller Excel), gjerne 3–6 måneder. Velg hvilken konto filen hører til.
+3. Appen spør om butikker den ikke kjenner («Hva er X?»). Svaret huskes til neste gang.
+4. Last opp en ny fil hver måned. Overlappende perioder er ikke noe problem, fordi duplikater hoppes over.
 
-## Funksjoner
+## Sidene
 
-| Side | Hva den gjør |
+| Side | Hva den viser |
 |---|---|
-| Oversikt | Inn, forbruk, sparing og netto per periode, forbruk per kategori, topp 10 steder, avvik og utvikling over tid |
-| Last opp | CSV/Excel fra DNB, Nordea, SpareBank 1, Sbanken, Bulder m.fl. Kjenner igjen kolonnene automatisk, ellers velger du selv (valget huskes per bankformat). Du kan slette enkeltopplastinger |
-| Transaksjoner | Søk og filtrer, endre kategori, marker overføringer og felles utgifter, lag regler |
-| Kategorier og regler | Kategoriser ukjente butikker i bulk, se og slett regler, valgfrie AI-forslag |
-| Abonnementer | Finner faste trekk automatisk (ukentlig til årlig) og viser en «Si opp?»-liste med løpende besparelse, prisøkninger, overlapp og trekk som har stoppet |
-| Tullball og prognoser | Tullball-detektor med konkrete sparebeløp, avvik mot vanlig nivå, «hva om»-simulering og kontantstrøm-prognose til neste lønning |
-| SIFO | Sammenligning med SIFO-referansebudsjettet for husholdningen din, med koblingen mellom kategoriene dine og SIFO-postene |
-| Budsjett | Forslag basert på snittet ditt og SIFO, 50/30/20-sjekk, oppfølging per periode og eksport til Excel |
-| Månedsrapport | PDF for én periode, enten «Bare meg» eller «Felles økonomi» (hvem har betalt hva, og hvem skylder hvem) |
-| Innstillinger og personvern | Kontoer, lønningsdag, AI av/på, slett en periode og **slett alle data** |
-
-I sidepanelet velger du mellom **kalendermåned** og **lønn til lønn**. Lønn-til-lønn bruker den faktiske lønnsdatoen når den finnes, for eksempel fredag før helg.
+| Hjem | Brukt, fått inn, spart og igjen denne måneden, hvor pengene gikk, tre tips og utviklingen måned for måned |
+| Pengene mine | Kategorier som smultring og liste, og alle kjøp. Trykk på en kategori for å endre den |
+| Abonnementer | Hva du betaler i måneden og året, prisøkninger, overlapp (f.eks. tre strømmetjenester) og «Beholde / Usikker / Si opp» med utregnet besparelse |
+| Budsjett | Ett trykk lager et budsjett ut fra vanene dine. Viser hva som er igjen per kategori (grønn, oransje, rød). Kan endres og lastes ned som Excel |
+| Innsikt | Sparetips, sammenligning med SIFO for noen på din alder, «hva om»-spaker, prognose fram til lønning og månedsrapport som PDF |
+| Last opp | Slipp filer fra DNB, Nordea, SpareBank 1, Sbanken, Bulder m.fl. Kolonnene kjennes igjen automatisk |
+| Innstillinger | Navnet ditt, kontoer (en sparekonto teller som sparing), opplastede filer, kalendermåned eller lønn til lønn, det du har lært appen, AI av/på og **slett alle data** |
 
 ## Personvern
 
 - Databasen og rapportene ligger i `~/.forbruksapp/` (en annen mappe kan settes med miljøvariabelen `FORBRUKSAPP_DIR`).
 - Appen lytter bare på `localhost`, og Streamlits bruksstatistikk er skrudd av i `.streamlit/config.toml`.
-- **AI-kategorisering er av som standard.** Når du slår den på, sendes bare butikknavn til Claude (Anthropic). Beløp, datoer, kontonumre og Vipps-/overføringstekster som kan inneholde personnavn sendes ikke. Du ser hva som sendes før du trykker, og forslagene må godkjennes. Funksjonen krever `ANTHROPIC_API_KEY` eller `ant auth login`.
+- **AI-hjelp er av som standard.** Se «AI-hjelp fra Claude» under.
 - **Slett alle data** (under Innstillinger) sletter databasen og alle genererte rapporter.
+
+## AI-hjelp fra Claude
+
+Claude kan foreslå kategorier for butikker appen ikke kjenner. Slå det på under **Innstillinger → AI-hjelp fra Claude**. Hver person bruker sin egen Claude, og det trengs ingen API-nøkkel.
+
+**Tre måter å bruke det på:**
+
+1. **Claude-appen på PC-en (Claude Desktop).** Trykk **Koble til Claude** og start Claude på nytt. Skriv så for eksempel «Hjelp meg å kategorisere utgiftene mine i Pengene mine». Appen er en liten MCP-server (`mcp_server.py`) med to verktøy: `hent_ukjente_utgifter` og `lagre_kategorier`. Knappen legger den inn i `claude_desktop_config.json`. Andre innstillinger beholdes, og det lages en sikkerhetskopi (`.json.bak`).
+2. **Rett i appen.** Hvis Claude Code finnes på maskinen (`claude`-kommandoen, eller den som følger med Claude-appen), kan du trykke **La Claude foreslå kategorier**. Du ser forslagene og godkjenner dem før de lagres. Appen bruker modellen «sonnet», med «haiku» som reserve.
+3. **Claude Code i terminalen.** Kommandoen for å legge til MCP-serveren står i appen.
+
+Med `ANTHROPIC_API_KEY` satt kan appen også bruke Claude-API-et direkte.
+
+**Hva Claude får se.** Bare anonymisert butikktekst, og om pengene gikk inn eller ut. Under Innstillinger kan du se nøyaktig hva som blir sendt.
+
+- Beløp, datoer, kontonumre, kortnumre, telefonnumre, e-post og nettadresser sendes aldri.
+- **Personnavn anonymiseres fullstendig** (`forbruk/anonymize.py`):
+  - Alt etter «Vipps», «Fra:», «Til:», «Overføring til», «Betaling til» o.l. regnes som et personnavn, med mindre det er en kjent butikk eller ser ut som et firma («AS», «kafé» …).
+  - Kjente fornavn (norske og vanlige utenlandske) fjernes hvor som helst i teksten, sammen med alle etternavn ved siden av, også med STORE bokstaver.
+  - To eller flere ord på rad som ser ut som navn («Olai Bergh»), skjules selv om fornavnet ikke er kjent.
+  - Etter «SumUp», «Zettle» o.l. skjules resten, fordi små butikker ofte står oppført med eierens navn.
+  - Navnet ditt blir «Deg selv».
+  - Personer blir «Person 1», «Person 2» …, og den samme personen får samme nummer. Koblingen til det ekte navnet forlater aldri maskinen.
+- Hver linje sendes med en tilfeldig id. Svaret kobles tilbake lokalt.
+- MCP-serveren nekter å gi ut noe når AI-hjelp er slått av i appen. Etter en oppdatering av appen må Claude startes på nytt, så serveren får den nye koden.
+- Kategorier fra Claude lagres som regler med kilde «ai», som du kan se og fjerne under «Det du har lært appen».
 
 ## Oppdatere SIFO-tall
 
@@ -73,7 +93,7 @@ SIFO dekker ikke bolig, lån, restaurant, alkohol eller ferie. Disse vises som �
 - `lønn*` treffer alt som begynner med «lønn».
 - `re:^giro \d+` er et regulært uttrykk.
 
-Prioritet: dine egne regler, så godkjente AI-forslag, så innebygde regler, og til slutt generelle regler (Vipps). Transaksjoner du har endret manuelt, røres aldri.
+Reglene lages automatisk når du svarer på «Hva er X?». Prioritet: dine egne regler, så godkjente AI-forslag, så innebygde regler, og til slutt generelle regler (Vipps). Transaksjoner du har endret manuelt, røres aldri.
 
 ## Duplikater
 
@@ -98,8 +118,11 @@ forbruk/
   sifo.py                  SIFO-sammenligning
   budget.py                Budsjettforslag, oppfølging, felles økonomi, Excel-eksport
   report.py                PDF-rapport
-  ai_categorize.py         Valgfri AI-kategorisering (av som standard)
-data/sifo_satser.json      SIFO-satser (eksempeltall – oppdater!)
+  ai_categorize.py         AI-hjelp med Claude (av som standard)
+  anonymize.py             Anonymisering av navn og tall før noe sendes
+  claude_connect.py        Kobler appen til Claude Desktop
+mcp_server.py              MCP-server for Claude Desktop / Claude Code
+data/sifo_satser.json      Offisielle SIFO-satser 2026
 eksempeldata/              Falske kontoutskrifter i fire filer og tre bankformater
 tests/                     pytest
 ```

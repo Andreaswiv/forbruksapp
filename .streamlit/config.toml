@@ -9,7 +9,12 @@ headless = true
 
 [theme]
 base = "light"
-primaryColor = "#2563eb"
+primaryColor = "#6d5dfc"
+backgroundColor = "#f6f6fb"
+secondaryBackgroundColor = "#efedff"
+textColor = "#1d1b3a"
+borderColor = "#e6e4f2"
+baseRadius = "large"
 
 [client]
 toolbarMode = "minimal"

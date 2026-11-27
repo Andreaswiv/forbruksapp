@@ -1,5 +1,7 @@
 """Lager falske kontoutskrifter i tre ulike bankformater for testing.
 
+Profil: «Emma Hansen», 20 år, student med deltidsjobb og hybel i Oslo.
+
 Kjør:  python eksempeldata/lag_eksempeldata.py
 
 Filer som lages:
@@ -19,6 +21,7 @@ import pandas as pd
 OUT = Path(__file__).resolve().parent
 START, END = date(2026, 5, 1), date(2026, 11, 25)
 BRUKSKONTO, SPAREKONTO = "1203.45.67890", "1203.98.76543"
+OWN_NAME = "Emma Hansen"
 
 
 def days():
@@ -33,7 +36,7 @@ def build_main(rng: random.Random) -> list[tuple[date, str, float]]:
     for d in days():
         # Faste ting
         if d.day == 1:
-            tx.append((d, "Husleie Gjensidige Eiendom avtalegiro", -11500))
+            tx.append((d, "Husleie hybel Sagene avtalegiro", -6500))
         if d.day == 3:
             tx.append((d, "Netflix.com", -179 if d < date(2026, 9, 1) else -199))   # prisøkning
             tx.append((d, "Spotify P2F8K1L9", -139))
@@ -44,27 +47,30 @@ def build_main(rng: random.Random) -> list[tuple[date, str, float]]:
         if d.day == 8 and d < date(2026, 9, 1):
             tx.append((d, "Viaplay Group", -449))                                      # sagt opp i sept
         if d.day == 10:
-            tx.append((d, "Tibber Norge strøm", -rng.randint(450, 1400)))
             tx.append((d, "SATS Norway medlemskap", -549))
         if d.day == 12:
             tx.append((d, "Apple.com/bill iCloud", -39))
             tx.append((d, "Google One storage", -25))
         if d.day == 15:
-            tx.append((d, "Lånekassen studielån", -1870))
-            tx.append((d, "Altibox internett", -699))
+            tx.append((d, "Lånekassen utbetaling", 11000))
         if d.day == 25:
-            tx.append((d, f"Overføring til egen konto {SPAREKONTO}", -3000))
+            tx.append((d, f"Overføring til egen konto {SPAREKONTO}", -1000))
+        # Penger mellom egne kontoer i en annen bank (kjennes igjen på navnet)
+        if d.day == 26:
+            tx.append((d, f"Overføring til {OWN_NAME}", -1500))
+        if d.day == 9 and d.month % 2 == 0:
+            tx.append((d, f"Fra: {OWN_NAME}", 800))
         # Lønn den 20. (fredag før hvis helg)
         payday = date(d.year, d.month, 20)
         while payday.weekday() >= 5:
             payday -= timedelta(days=1)
         if d == payday:
-            tx.append((d, "Lønn Fjellsiden Konsult AS", 38500))
+            tx.append((d, "Lønn Fjellsiden Konsult AS", 14500))
         # Dagligvarer
         if rng.random() < 0.55:
             store = rng.choice(["Rema 1000 Grünerløkka", "Kiwi 505 Torshov", "Coop Extra Storo",
                                 "Meny Storo", "Joker Sagene"])
-            amount = round(rng.uniform(80, 900), 2)
+            amount = round(rng.uniform(60, 450), 2)
             tx.append((d, f"Varekjøp {store} Dato {d:%d.%m}", -amount))
         # Takeaway – mer i helgene
         if rng.random() < (0.45 if d.weekday() >= 4 else 0.12):
@@ -79,7 +85,7 @@ def build_main(rng: random.Random) -> list[tuple[date, str, float]]:
             tx.append((d, "7-Eleven Torggata", -round(rng.uniform(25, 95), 2)))
         # Transport
         if d.day == 2:
-            tx.append((d, "Ruter 30-dagersbillett", -892))
+            tx.append((d, "Ruter 30-dagersbillett student", -612))
         if rng.random() < 0.04:
             tx.append((d, "Bolt Operations", -round(rng.uniform(120, 350), 2)))
         # Diverse

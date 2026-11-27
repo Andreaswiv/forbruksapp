@@ -20,7 +20,7 @@ def test_demo_end_to_end(conn, demo_dir, tmp_path):
     df = load_demo(conn, demo_dir)
     d = analysis.add_periods(df, "kalender")
     summ = analysis.period_summary(d)
-    assert (summ[summ["complete"]]["Sparing"] == 3000).all()     # overføring til sparekonto = sparing
+    assert (summ[summ["complete"]]["Sparing"] == 1000).all()     # overføring til sparekonto = sparing
     assert not summ.iloc[-1]["complete"]                          # november pågår
     subs = subscriptions.find_subscriptions(d)
     names = {s.name for s in subs}
