@@ -12,7 +12,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from forbruk import (ai_categorize, analysis, budget, categorize, claude_connect, config, db, importer,
+from forbruk import (ai_categorize, analysis, budget, categorize, claude_connect, config, db, importer, plan,
                      report, sifo, subscriptions)
 from forbruk.categorize import EXPENSE_CATEGORIES
 
@@ -219,7 +219,7 @@ def page_home():
     summ = analysis.period_summary(df).set_index("period")
     cur = summ.loc[period]
     p = df[df["period"] == period]
-    b = db.get_budget(conn)
+    b = budget_for_period(df, period)
 
     left = cur["Inn"] - cur["Forbruk"] - cur["Sparing"]
     budget_html = ""
@@ -363,14 +363,22 @@ def page_money():
         v = v[v["text"].str.contains(q, case=False, regex=False)]
     if cat != "Alle kategorier":
         v = v[v["category"] == cat]
-    v = v.head(500)
+    tx_editor(v, "tx_editor")
+
+
+def tx_editor(v: pd.DataFrame, key: str):
+    """Kjøp og innbetalinger der kategorien kan endres – lagres med en gang."""
+    v = v.sort_values("date", ascending=False).head(500)
+    if v.empty:
+        st.caption("Ingen kjøp ennå.")
+        return
     edit = v[["id", "date", "text", "amount", "category"]].copy()
     edit["date"] = edit["date"].dt.date
     options = PICK_CATEGORIES + ["Ukategorisert"]
     edit["category"] = edit["category"].where(edit["category"].isin(options), "Annet")
     edited = st.data_editor(
         edit, hide_index=True, width="stretch", height=min(460, 38 + 35 * max(len(edit), 1)),
-        key="tx_editor", disabled=["id", "date", "text", "amount"],
+        key=key, disabled=["id", "date", "text", "amount"],
         column_config={
             "id": None,
             "date": st.column_config.DateColumn("Dato", format="DD.MM", width="small"),
@@ -383,7 +391,7 @@ def page_money():
         for r in changed.itertuples():
             categorize.set_manual_category(conn, int(r.id), r.category)
         st.cache_data.clear()
-        st.session_state.pop("tx_editor", None)
+        st.session_state.pop(key, None)
         st.toast(f"Lagret {len(changed)} endring{'er' if len(changed) > 1 else ''} ✅")
         st.rerun()
     st.caption("Trykk på en kategori for å endre den. Endringen lagres med en gang.")
@@ -496,42 +504,312 @@ def sub_row(s, statuses):
 
 
 # ======================================================================== budsjett
+def budget_for_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Budsjettet som gjelder en periode: planen for den måneden, ellers det gamle budsjettet."""
+    rows = df[df["period"] == period]
+    if not rows.empty:
+        p = plan.get_plan(conn, str(rows["period_start"].iloc[0].to_period("M")))
+        if p:
+            return plan.by_category(p)
+    return db.get_budget(conn)
+
+
 def page_budget():
     df = load_df()
     if df.empty:
         welcome()
         return
     st.title("Budsjett")
-    b = db.get_budget(conn)
     subs = subscriptions.find_subscriptions(df)
-    cmp, _ = sifo_cmp(df)
-    suggestion, info = budget.suggest(df, cmp, setting("sifo_mapping", sifo.DEFAULT_MAPPING), subs)
+    cur, nxt = plan.this_month(), plan.next_month()
+    t_follow, t_plan = st.tabs(["📊 Slik går det", "📝 Planlegg"])
+    with t_follow:
+        d = plan.with_months(df)
+        have = sorted(d["month"].unique(), reverse=True)
+        options = ([cur] if cur not in have else []) + have[:12]
+        start = cur if cur in have else have[0]
+        if cur not in have:
+            st.info(f"Det er ingen kjøp fra {plan.month_name(cur)} ennå – siste kontoutskrift går til "
+                    f"{df['date'].max():%d.%m.%Y}. Last opp en ny under **Last opp** for å følge med på denne måneden. "
+                    f"Så lenge viser vi {plan.month_name(start)}.", icon="📅")
+        month = st.selectbox("Måned", options, index=options.index(start), key="follow_month",
+                             format_func=lambda m: plan.month_name(m).capitalize()
+                             + (" (denne måneden)" if m == cur else ""), label_visibility="collapsed")
+        budget_follow_up(df, month)
+    with t_plan:
+        month = st.segmented_control("Måned", [nxt, cur], default=nxt, key="plan_month",
+                                     format_func=lambda m: ("Neste måned · " if m == nxt else "Denne måneden · ")
+                                     + plan.month_name(m).capitalize(), label_visibility="collapsed") or nxt
+        budget_planner(df, subs, month)
 
-    if b.empty:
-        st.markdown('<div class="hero"><div class="big" style="font-size:34px">Lag ditt første budsjett ✨</div>'
-                    '<div style="font-size:16px;opacity:.95">Appen ser på hva du vanligvis bruker, kutter litt der '
-                    'det er lett å spare, og setter av penger til sparing. Du kan endre alt etterpå.</div></div>',
+
+def plan_overview(p: dict, month: str, edit_key: str):
+    """Lagret plan: en enkel oversikt over hva pengene skal gå til."""
+    name = plan.month_name(month)
+    t = plan.totals(p)
+    left = t["ufordelt"]
+    st.markdown(f'<div class="hero"><div class="label">Det du har planlagt å bruke i {esc(name)}</div>'
+                f'<div class="big">{kr(t["ut"])}</div>'
+                f'<div class="row"><div>Inn<b>{kr(t["inn"])}</b></div><div>Faste<b>{kr(t["faste"])}</b></div>'
+                f'<div>Egne planer<b>{kr(t["egne"])}</b></div><div>Resten<b>{kr(t["resten"])}</b></div>'
+                f'<div>Sparing<b>{kr(t["sparing"])}</b></div>'
+                f'<div>{"Ufordelt" if left >= 0 else "Over"}<b>{kr(abs(left))}</b></div></div></div>',
+                unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1.3, 1, 1])
+    if c1.button("✏️ Endre planen", type="primary", width="stretch", key=f"edit_{month}"):
+        st.session_state[edit_key] = True
+        st.rerun()
+    c3.download_button("⬇️ Excel", budget.to_excel(plan.by_category(p)), file_name=f"budsjett-{month}.xlsx",
+                       width="stretch", key=f"xl_{month}",
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    bc = plan.by_category(p)
+    spend = bc[bc["kind"] != "sparing"].set_index("category")["amount"].sort_values(ascending=False)
+    named: dict[str, list[str]] = {}
+    for r in p["faste"] + p["egne"]:
+        if r.get("kategori") and r.get("navn"):
+            named.setdefault(r["kategori"], []).append(r["navn"])
+    c1, c2 = st.columns([1.5, 1], gap="medium")
+    if not spend.empty:
+        c1.markdown(f'<div class="card"><h4>Hva pengene skal gå til</h4>'
+                    f'{category_rows(list(spend.items()), spend.max(), sub=lambda c: ", ".join(named.get(c, [])))}</div>',
                     unsafe_allow_html=True)
-        c = st.columns(3)
-        c[0].markdown(stat("Du får vanligvis inn", kr(info["inntekt"])), unsafe_allow_html=True)
-        c[1].markdown(stat("Forslag til forbruk", kr(info["sum_utgifter"])), unsafe_allow_html=True)
-        c[2].markdown(stat("Forslag til sparing", kr(info["sparing"])), unsafe_allow_html=True)
-        st.write("")
-        if st.button("Lag budsjett for meg", type="primary"):
-            db.save_budget(conn, suggestion[["category", "amount", "kind"]])
-            st.rerun()
-        return
 
-    period = month_picker(df, "budget_month")
-    label, complete = period_info(df, period)
-    stt = budget.status(df, b, period)
+    def lst(title, items):
+        rows = "".join(f'<div class="catrow"><div class="ic">{EMOJI.get(o.get("kategori"), "💰")}</div>'
+                       f'<div><div class="nm">{esc(o.get("navn") or o.get("kategori"))}</div>'
+                       f'<div class="sub">{esc(o.get("kategori") or "")}</div></div>'
+                       f'<div class="amt">{kr(o["beløp"])}</div></div>' for o in items if o.get("beløp"))
+        if rows:
+            c2.markdown(f'<div class="card"><h4>{title}</h4>{rows}</div>', unsafe_allow_html=True)
+    lst("💰 Inn", p["inntekter"])
+    lst("✍️ Noe spesielt", p["egne"])
+    lst("🏠 Faste utgifter", p["faste"])
+
+
+def row_editor(key: str, rows: list[dict], fields: list[str], add_label: str, default_cat: str = "Annet",
+               notes: list[str] | None = None, placeholder: str = "") -> list[dict]:
+    """Enkle rader med knapper som alltid synes: skriv rett i feltene, 🗑️ sletter linjen, ➕ legger til en ny."""
+    if key not in st.session_state:
+        st.session_state[key] = [dict(r, _id=i, _note=(notes[i] if notes else "")) for i, r in enumerate(rows)]
+    items = st.session_state[key]
+    labels = {"navn": "Hva", "kategori": "Kategori", "beløp": "Beløp"}
+    spec = [{"navn": 3, "kategori": 2.4, "beløp": 1.6}[f] for f in fields] + [1]
+    if items:
+        for c, f in zip(st.columns(spec), fields):
+            c.markdown(f"<div class='muted'>{labels[f]}</div>", unsafe_allow_html=True)
+    out = []
+    for r in list(items):
+        rid, vals = r["_id"], {}
+        cols = st.columns(spec, vertical_alignment="center")
+        for c, f in zip(cols, fields):
+            wk = f"{key}_{f}_{rid}"
+            if f == "navn":
+                vals[f] = c.text_input(labels[f], r.get(f) or "", key=wk, placeholder=placeholder,
+                                       label_visibility="collapsed").strip()
+            elif f == "kategori":
+                cat = r.get(f) or default_cat
+                opts = PICK_CATEGORIES if cat in PICK_CATEGORIES else PICK_CATEGORIES + [cat]
+                vals[f] = c.selectbox(labels[f], opts, index=opts.index(cat), key=wk, label_visibility="collapsed",
+                                      format_func=lambda x: f"{EMOJI.get(x, '📦')} {x}")
+            else:
+                vals[f] = float(c.number_input(labels[f], min_value=0, value=int(round(r.get(f) or 0)), step=50,
+                                               key=wk, label_visibility="collapsed"))
+        if cols[-1].button("Slett", icon="🗑️", key=f"{key}_del_{rid}", width="stretch"):
+            items.remove(r)
+            st.rerun()
+        r.update(vals)
+        if r.get("_note"):
+            cols[0].caption(r["_note"])
+        if vals.get("beløp") or vals.get("navn"):
+            out.append({f: vals[f] for f in fields})
+    if st.button(add_label, icon="➕", key=f"{key}_add"):
+        nid = max((r["_id"] for r in items), default=-1) + 1
+        items.append({"_id": nid, "navn": "", "kategori": default_cat, "beløp": 0})
+        st.rerun()
+    return out
+
+
+def budget_planner(df, subs, month: str):
+    name = plan.month_name(month)
+    saved = plan.get_plan(conn, month)
+    # Et forslag som ikke er lagret, lages på nytt når dataene eller forslagslogikken endrer seg,
+    # så du aldri sitter med et gammelt forslag
+    base_key = f"plan_base_{month}_saved" if saved else \
+        f"plan_base_{month}_{data_version()}_{plan.SUGGESTION_VERSION}"
+    ver_key = f"plan_ver_{month}"
+    if base_key not in st.session_state:
+        if saved:
+            st.session_state[base_key] = saved
+        else:
+            fresh = plan.new_plan(df, subs, month)
+            fresh["resten"] = None           # følger forslaget til du lagrer
+            st.session_state[base_key] = fresh
+    base = st.session_state[base_key]
+    ver = st.session_state.get(ver_key, 0)
+    k = f"{month}_{ver}_{abs(hash(base_key)) % 10**6}"   # nytt forslag = nye tabeller
+
+    edit_key = f"plan_edit_{month}"
+    if saved and not st.session_state.get(edit_key):
+        plan_overview(saved, month, edit_key)
+        return
+    if saved:
+        st.info(f"Du endrer planen for {name}. Trykk **Lagre** når du er ferdig.", icon="✏️")
+    else:
+        st.caption(f"Appen har fylt inn et forslag ut fra hva du vanligvis får inn og bruker. "
+                   f"Endre det som ikke stemmer – alt kan endres.")
+    top = st.container()
+
+    # 1. Inntekt
+    with st.container(border=True):
+        st.markdown(f"#### 💰 1. Hva får du inn i {name}?")
+        st.caption("Lønn, stipend, støtte hjemmefra … Skriv rett i feltene for å endre.")
+        incomes = row_editor(f"inc_{k}", base["inntekter"], ["navn", "beløp"], "Legg til inntekt",
+                             placeholder="f.eks. Lønn")
+        income = sum(r["beløp"] for r in incomes)
+
+    # 2. Faste utgifter
+    with st.container(border=True):
+        st.markdown("#### 🏠 2. Faste utgifter")
+        st.caption("Det som trekkes uansett: husleie, mobil, buss, abonnementer. Funnet automatisk fra kontoutskriftene.")
+        fixed = row_editor(f"fix_{k}", base["faste"], ["navn", "kategori", "beløp"], "Legg til fast utgift",
+                           default_cat="Bolig", placeholder="f.eks. Husleie")
+        st.markdown(f"<div class='muted'>Til sammen <b>{kr(sum(r['beløp'] for r in fixed))}</b></div>",
+                    unsafe_allow_html=True)
+
+    # 3. Egne planer
+    with st.container(border=True):
+        st.markdown(f"#### ✍️ 3. Noe spesielt i {name}?")
+        st.caption("Bursdager, julegaver, konsert, tur, ny jakke … Legg det inn her, så tar forslaget hensyn til det.")
+        own = row_editor(f"own_{k}", base["egne"], ["navn", "kategori", "beløp"], "Legg til noe",
+                         default_cat="Gaver", placeholder="f.eks. Julegaver")
+
+    fixed_total, own_total = sum(r["beløp"] for r in fixed), sum(r["beløp"] for r in own)
+
+    # 4. Sparing
+    with st.container(border=True):
+        st.markdown("#### 🐷 4. Hvor mye vil du spare?")
+        room = max(income - fixed_total - own_total, 0)
+        top_val = int(max(room, float(base.get("sparing") or 0), 100))
+        saving = st.slider("Sparing", 0, top_val, min(int(base.get("sparing") or 0), top_val), step=100,
+                           format="%d kr", key=f"sav_{k}", label_visibility="collapsed")
+        hint = plan.suggest_saving(income, fixed_total)
+        st.caption((f"{saving / income * 100:.0f} % av det du får inn. " if income else "")
+                   + f"Forslag: {kr(hint)} (ca. 10 %). Litt hver måned blir mye over tid.")
+
+    # 5. Resten
+    rest_df, missing = plan.suggest_rest(df, income, fixed, own, saving)
+    if base.get("resten") is not None:          # lagret plan: bruk det du valgte
+        mine = {r["kategori"]: r["beløp"] for r in base["resten"]}
+        rest_df["beløp"] = [mine.get(c, b) for c, b in zip(rest_df["kategori"], rest_df["beløp"])]
+        rest_df["hvorfor"] = ["ditt valg" if c in mine else h for c, h in zip(rest_df["kategori"], rest_df["hvorfor"])]
+        extra = [r for r in base["resten"] if r["kategori"] not in set(rest_df["kategori"])]
+        if extra:
+            rest_df = pd.concat([rest_df, pd.DataFrame([dict(r, vanligvis=0, hvorfor="ditt valg") for r in extra])],
+                                ignore_index=True)
+    with st.container(border=True):
+        st.markdown("#### 🛒 5. Forslag til resten")
+        st.caption("Mat, uteliv, klær og annet som varierer. Forslaget bygger på hva du vanligvis bruker, "
+                   "med litt kutt der det er lett å spare. Endre beløpene som du vil.")
+        # Nytt forslag når det du har fylt inn over endrer seg
+        sig = abs(hash(tuple(zip(rest_df["kategori"], rest_df["beløp"])))) % 10**8
+        notes = [f"Vanligvis {kr(v)}" + (f" · {h}" if h else "")
+                 for v, h in zip(rest_df["vanligvis"], rest_df["hvorfor"].fillna(""))]
+        rest = row_editor(f"rest_{k}_{sig}", rest_df[["kategori", "beløp"]].to_dict("records"),
+                          ["kategori", "beløp"], "Legg til kategori", notes=notes)
+        if st.button("🔄 Fordel resten på nytt"):
+            base.update(inntekter=incomes, faste=fixed, egne=own, sparing=saving, resten=None)
+            st.session_state[ver_key] = ver + 1
+            st.rerun()
+
+    current = {"måned": month, "inntekter": incomes, "faste": fixed, "egne": own, "sparing": saving, "resten": rest}
+    t = plan.totals(current)
+
+    # Oppsummering øverst
+    with top:
+        left = t["ufordelt"]
+        if left < -0.5:
+            style, label = ' style="background:linear-gradient(135deg,#ef4444,#f97316)"', "Du har planlagt mer enn du får inn"
+        elif left > 0.5:
+            style, label = "", "Igjen å fordele"
+        else:
+            style, label = ' style="background:linear-gradient(135deg,#16a34a,#22c55e)"', "Alt er fordelt ✅"
+        st.markdown(f'<div class="hero"{style}><div class="label">{label}</div>'
+                    f'<div class="big">{kr(abs(left))}</div>'
+                    f'<div class="row"><div>Inn<b>{kr(t["inn"])}</b></div><div>Faste<b>{kr(t["faste"])}</b></div>'
+                    f'<div>Egne planer<b>{kr(t["egne"])}</b></div><div>Sparing<b>{kr(t["sparing"])}</b></div>'
+                    f'<div>Resten<b>{kr(t["resten"])}</b></div></div></div>', unsafe_allow_html=True)
+        if missing > 0:
+            st.warning(f"Pengene strekker ikke helt til, selv med kutt: det mangler ca. {kr(missing)}. "
+                       "Prøv å spare litt mindre denne måneden, eller se om noen av de faste utgiftene kan kuttes.",
+                       icon="⚠️")
+    if left > 0.5:
+        c1, c2 = st.columns(2)
+        if c1.button(f"🐷 Legg {kr(left)} i sparing", width="stretch"):
+            base.update(inntekter=incomes, faste=fixed, egne=own, sparing=saving + left, resten=rest)
+            st.session_state[ver_key] = ver + 1
+            st.rerun()
+        c2.caption("…eller la det stå som buffer for uventede utgifter.")
+
+    c1, c2, c3 = st.columns([1.3, 1, 1])
+    if c1.button(f"💾 Lagre plan for {name}", type="primary", width="stretch"):
+        plan.save_plan(conn, current)
+        st.session_state[base_key] = current
+        st.session_state[edit_key] = False           # tilbake til oversikten
+        st.session_state[ver_key] = ver + 1          # tabellene starter fra det lagrede
+        st.toast(f"Planen for {name} er lagret ✅")
+        st.rerun()
+    if c2.button("Start på nytt", width="stretch"):
+        st.session_state.pop(base_key, None)
+        st.session_state[ver_key] = ver + 1
+        plan.delete_plan(conn, month)
+        st.rerun()
+    c3.download_button("⬇️ Excel", budget.to_excel(plan.by_category(current)), file_name=f"budsjett-{month}.xlsx",
+                       width="stretch", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+def budget_follow_up(df, month: str):
+    _follow_up_summary(df, month)
+    name = plan.month_name(month)
+    st.markdown(f"#### 🧾 Det du har brukt penger på i {name}")
+    st.caption("Står noe i feil kategori? Trykk på kategorien og velg riktig – tallene over oppdateres med en gang.")
+    d = plan.with_months(df)
+    tx_editor(d[d["month"] == month].drop(columns="month"), "follow_tx")
+
+
+def _follow_up_summary(df, month: str):
+    name = plan.month_name(month)
+    p = plan.get_plan(conn, month)
+    if p:
+        stt = plan.follow_up(df, p)
+    else:
+        d = plan.with_months(df)
+        sp = analysis.spending(d[d["month"] == month])
+        by = sp.groupby("category")["spend"].sum()
+        by = by[by > 0].sort_values(ascending=False)
+        st.markdown(f'<div class="hero"><div class="label">Brukt i {esc(name)}</div>'
+                    f'<div class="big">{kr(by.sum())}</div></div>', unsafe_allow_html=True)
+        if not by.empty:
+            n = sp.groupby("category").size()
+            st.markdown(f'<div class="card"><h4>Per kategori</h4>'
+                        f'{category_rows(list(by.items()), by.max(), sub=lambda c: f"{n[c]} kjøp")}</div>',
+                        unsafe_allow_html=True)
+        if month in (plan.this_month(), plan.next_month()):
+            st.caption("Lag en plan under **📝 Planlegg** for å se hvor mye du har igjen å bruke.")
+        return
+    if stt.empty:
+        st.info("Ingen tall for denne måneden ennå.")
+        return
     spend = stt[stt["Type"] != "sparing"]
     total_b, total_used = spend["Budsjett"].sum(), spend["Brukt"].sum()
     left = total_b - total_used
     pct = total_used / total_b * 100 if total_b else 0
-    st.markdown(f'<div class="hero"><div class="label">{"Igjen å bruke" if left >= 0 else "Over budsjettet"} i {esc(label)}</div>'
+    today = pd.Timestamp.today()
+    days_left = (pd.Period(month, "M").end_time.normalize() - today.normalize()).days + 1 if month == plan.this_month() else 0
+    per_day = f'<div>Per dag resten av måneden<b>{kr(max(left, 0) / days_left)}</b></div>' if days_left > 0 else ""
+    st.markdown(f'<div class="hero"><div class="label">{"Igjen å bruke" if left >= 0 else "Over budsjettet"} i {esc(name)}</div>'
                 f'<div class="big">{kr(abs(left))}</div>'
-                f'<div class="row"><div>Budsjett<b>{kr(total_b)}</b></div><div>Brukt{" hittil" if not complete else ""}<b>{kr(total_used)}</b></div></div>'
+                f'<div class="row"><div>Planlagt<b>{kr(total_b)}</b></div><div>Brukt hittil<b>{kr(total_used)}</b></div>{per_day}</div>'
                 f'<div class="pbar"><div style="width:{min(pct, 100):.0f}%"></div></div></div>', unsafe_allow_html=True)
 
     rows = []
@@ -543,7 +821,7 @@ def page_budget():
             sub = f"{kr(used)} av {kr(bud)}" + (f" · {kr(used - bud)} over" if used > bud else "")
             amt = f"{kr(bud - used)} igjen" if used <= bud else ""
         else:
-            sub, amt = "Ikke med i budsjettet", kr(used)
+            sub, amt = "Ikke med i planen", kr(used)
         rows.append(f'<div class="catrow"><div class="ic">{EMOJI.get(r.Kategori, "📦")}</div>'
                     f'<div><div class="nm">{esc(r.Kategori)}</div><div class="sub">{esc(sub)}</div>'
                     f'<div class="bar"><div style="width:{max(min(100, ratio * 100), 2):.0f}%;background:{color}"></div></div></div>'
@@ -559,32 +837,11 @@ def page_budget():
                         f'<div class="muted">av {kr(sv["Budsjett"])} som er målet</div>'
                         f'<div class="bar" style="height:10px"><div style="width:{min(ratio * 100, 100):.0f}%;background:#22c55e"></div></div></div>',
                         unsafe_allow_html=True)
-        st.markdown(f'<div class="card"><h4>💡 Slik er budsjettet laget</h4><div class="muted">Det bygger på hva du '
-                    f'vanligvis bruker, med litt kutt i takeaway, klær og lignende. Du får vanligvis inn '
-                    f'<b>{kr(info["inntekt"])}</b> i måneden.</div></div>', unsafe_allow_html=True)
-
-    with st.expander("✏️ Endre budsjettet"):
-        new = {}
-        cols = st.columns(2)
-        for i, r in enumerate(b.itertuples()):
-            new[r.category] = (cols[i % 2].number_input(f"{EMOJI.get(r.category, '')} {r.category}", min_value=0,
-                                                        value=int(r.amount), step=100, key=f"b_{r.category}"), r.kind)
-        add = st.selectbox("Legg til kategori", [c for c in PICK_CATEGORIES if c not in new], index=None,
-                           placeholder="Legg til en kategori …")
-        c1, c2, c3 = st.columns([1, 1, 2])
-        if c1.button("Lagre", type="primary", width="stretch"):
-            rows = [{"category": c, "amount": a, "kind": k} for c, (a, k) in new.items()]
-            if add:
-                rows.append({"category": add, "amount": 0,
-                             "kind": "sparing" if add == "Sparing" else "fast" if add in budget.FIXED_CATEGORIES else "variabel"})
-            db.save_budget(conn, pd.DataFrame(rows))
-            st.rerun()
-        if c2.button("Lag nytt forslag", width="stretch"):
-            db.save_budget(conn, suggestion[["category", "amount", "kind"]])
-            st.rerun()
-        c3.download_button("⬇️ Last ned som Excel", budget.to_excel(b, stt, info), file_name="budsjett.xlsx",
-                           width="stretch",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        if p and p["egne"]:
+            items = "".join(f'<div class="catrow"><div class="ic">{EMOJI.get(o["kategori"], "📦")}</div>'
+                            f'<div><div class="nm">{esc(o["navn"])}</div><div class="sub">{esc(o["kategori"])}</div></div>'
+                            f'<div class="amt">{kr(o["beløp"])}</div></div>' for o in p["egne"])
+            st.markdown(f'<div class="card"><h4>✍️ Det du har planlagt</h4>{items}</div>', unsafe_allow_html=True)
 
 
 # ======================================================================== innsikt
@@ -709,7 +966,7 @@ def page_insight():
         period = month_picker(df, "rep_month")
         if st.button("Lag månedsrapport", type="primary"):
             with st.spinner("Lager rapport …"):
-                path = report.build(df, period, subs=subs, budget=db.get_budget(conn), sifo_cmp=cmp,
+                path = report.build(df, period, subs=subs, budget=budget_for_period(df, period), sifo_cmp=cmp,
                                     findings=analysis.findings(df, subs, cmp), variant="meg")
             st.session_state["report_path"] = str(path)
         rp = st.session_state.get("report_path")
