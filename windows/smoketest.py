@@ -63,12 +63,27 @@ def run():
     step("Launcheren starter og stopper appen")
     import launcher
     print("nettleser for app-vindu:", launcher.find_app_browser())
-    launcher.open_window = lambda port: (print("app svarer på port", port, launcher.healthy(port)),
-                                         subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"]))[1]
+    import socket
+    import threading
+
+    def fake_window(port):
+        """Som et ekte vindu: holder en forbindelse åpen i 8 sekunder, så «lukkes» det."""
+        print("app svarer på port", port, launcher.healthy(port))
+
+        def hold():
+            with socket.create_connection(("127.0.0.1", port)):
+                time.sleep(8)
+        threading.Thread(target=hold, daemon=True).start()
+
+    launcher.open_window = fake_window
+    launcher.FIRST_CONNECT, launcher.IDLE_STOP = 30, 4
     t = time.time()
     assert launcher.main() == 0, "launcheren returnerte feil"
+    took = time.time() - t
     assert not launcher.STATE.exists()
-    print(f"OK på {time.time() - t:.0f} s")
+    assert took >= 8, f"appen stoppet mens vinduet fortsatt var åpent (etter {took:.0f} s)"
+    assert "vinduet er lukket" in (launcher.LOG.read_text(encoding="utf-8")), "stoppet av feil grunn"
+    print(f"OK: appen levde mens vinduet var åpent og stoppet {took:.0f} s etter start")
 
 
 def report(text: str) -> None:

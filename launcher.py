@@ -151,16 +151,8 @@ def main() -> int:
                 return 1
             time.sleep(0.3)
         STATE.write_text(json.dumps({"port": port, "pid": server.pid}))
-        window = open_window(port)
-        if window is None:
-            server.wait()                       # vanlig nettleser: la appen kjøre til PC-en slås av
-        else:
-            window.wait()
-            # Vinduet kan ha blitt overtatt av en annen prosess med samme profil – vent til alle er lukket
-            lock = DATA_DIR / "vindu" / "lockfile"
-            while lock.exists() and _locked(lock):
-                time.sleep(1)
-            log("vinduet er lukket – stopper appen")
+        open_window(port)
+        wait_until_closed(server, port)
     finally:
         try:
             STATE.unlink()
@@ -175,15 +167,49 @@ def main() -> int:
     return 0
 
 
-def _locked(path: Path) -> bool:
-    """Edge/Chrome holder «lockfile» åpen på Windows så lenge profilen er i bruk."""
-    if not WINDOWS:
-        return False
+# Hvor lenge appen venter på at vinduet kobler til, og hvor lenge den kan stå uten vindu
+FIRST_CONNECT = 180
+IDLE_STOP = 20
+
+
+def connections(port: int) -> int:
+    """Antall åpne forbindelser til appen. Et åpent vindu holder alltid én forbindelse (websocket)."""
+    target = f":{port}"
     try:
-        os.rename(path, path)                   # lykkes bare når ingen har filen åpen
-        return False
-    except OSError:
-        return True
+        if WINDOWS:
+            out = subprocess.run(["netstat", "-an", "-p", "TCP"], capture_output=True, text=True, timeout=10,
+                                 creationflags=NO_WINDOW).stdout
+            # «  TCP    127.0.0.1:8601    127.0.0.1:53211    ESTABLISHED»
+            return sum(1 for line in out.splitlines()
+                       if "ESTABLISHED" in line and len(line.split()) >= 4 and line.split()[1].endswith(target))
+        out = subprocess.run(["lsof", "-nP", f"-iTCP{target}", "-sTCP:ESTABLISHED"], capture_output=True,
+                             text=True, timeout=10).stdout
+        # «python 123 ... TCP 127.0.0.1:8601->127.0.0.1:53211 (ESTABLISHED)»
+        return sum(1 for line in out.splitlines() if f"{target}->" in line)
+    except (OSError, subprocess.SubprocessError):
+        return 1                                # vet ikke – la appen kjøre
+
+
+def wait_until_closed(server: subprocess.Popen, port: int) -> None:
+    """Stopp først når ingen vinduer har vært koblet til appen på en stund.
+
+    Vi følger forbindelsene i stedet for nettleserprosessen, fordi Edge ofte starter seg selv på nytt
+    (særlig første gang) – da ser det ut som vinduet er lukket selv om det er åpent."""
+    start, seen, idle_since = time.time(), False, None
+    while server.poll() is None:
+        if connections(port):
+            seen, idle_since = True, None
+        elif not seen:
+            if time.time() - start > FIRST_CONNECT:
+                log("ingen vinduer koblet til – stopper appen")
+                return
+        else:
+            idle_since = idle_since or time.time()
+            if time.time() - idle_since > IDLE_STOP:
+                log("vinduet er lukket – stopper appen")
+                return
+        time.sleep(2)
+    log(f"serveren stoppet selv (kode {server.returncode})")
 
 
 if __name__ == "__main__":
