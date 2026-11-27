@@ -16,7 +16,8 @@ from forbruk import (ai_categorize, analysis, budget, categorize, claude_connect
                      report, sifo, subscriptions)
 from forbruk.categorize import EXPENSE_CATEGORIES
 
-st.set_page_config(page_title="Pengene mine", page_icon="💜", layout="wide")
+_ICON = Path(__file__).parent / "windows" / "ikon.png"
+st.set_page_config(page_title="Pengene mine", page_icon=str(_ICON) if _ICON.exists() else "💜", layout="wide")
 config.ensure_dirs()
 PROJECT = Path(__file__).resolve().parent
 
