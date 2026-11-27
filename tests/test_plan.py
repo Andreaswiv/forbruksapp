@@ -102,3 +102,28 @@ def test_student_salary_depends_on_season(conn):
     assert dec == 7500                     # median av september–mai
     assert jul == 22000                    # median av juni–august
     assert "lavere utenom sommeren" in plan.season_note("2026-12")
+
+
+def test_money_in_from_annet_place_is_not_negative_spending(conn):
+    """En regel lært fra et kjøp («Annet») skal ikke gjøre lønn fra samme sted til minus-forbruk."""
+    from forbruk import analysis
+    aid = db.get_or_create_account(conn, "Brukskonto", "DNB", None)
+    categorize.add_rule(conn, "universitetet i", "Annet")
+    rows = [("2026-10-29", "Universitetet i Agder", -750.0), ("2026-11-11", "UNIVERSITETET I AGDER", 13755.0)]
+    db.insert_transactions(conn, pd.DataFrame(rows, columns=["date", "text", "amount"]), aid, "t.csv")
+    categorize.refresh(conn)
+    df = db.load_transactions(conn)
+    assert df.set_index("amount").loc[13755.0, "category"] == "Inntekt annet"
+    assert (analysis.spending(df).groupby("category")["spend"].sum() >= 0).all()
+
+
+def test_payments_to_people_are_not_subscriptions(conn):
+    aid = db.get_or_create_account(conn, "Brukskonto", "DNB", None)
+    rows = []
+    for m in ("2026-07", "2026-08", "2026-09", "2026-10"):
+        rows += [(f"{m}-03", "Vipps*Kari Nordmann", -110.0), (f"{m}-05", "Netflix.com", -199.0),
+                 (f"{m}-07", "Hbo Max", -129.0)]
+    db.insert_transactions(conn, pd.DataFrame(rows, columns=["date", "text", "amount"]), aid, "t.csv")
+    categorize.refresh(conn)
+    names = {s.name for s in subscriptions.find_subscriptions(db.load_transactions(conn))}
+    assert {"Netflix", "Hbo Max"} <= names and not any("Kari" in n for n in names)

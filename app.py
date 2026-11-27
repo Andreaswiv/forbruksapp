@@ -537,9 +537,9 @@ def page_budget():
                              + (" (denne måneden)" if m == cur else ""), label_visibility="collapsed")
         budget_follow_up(df, month)
     with t_plan:
-        month = st.segmented_control("Måned", [nxt, cur], default=nxt, key="plan_month",
+        month = st.segmented_control("Måned", [cur, nxt], default=cur, key="plan_month",
                                      format_func=lambda m: ("Neste måned · " if m == nxt else "Denne måneden · ")
-                                     + plan.month_name(m).capitalize(), label_visibility="collapsed") or nxt
+                                     + plan.month_name(m).capitalize(), label_visibility="collapsed") or cur
         budget_planner(df, subs, month)
 
 

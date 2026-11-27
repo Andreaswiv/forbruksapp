@@ -211,5 +211,13 @@ def _caps_name(w: str) -> bool:
     return len(w) >= 2 and w.isalpha() and w.isupper() and w.lower() not in BUSINESS
 
 
+def is_private_person(text: str) -> bool:
+    """Strengere enn anonymiseringen: teksten begynner (etter «Vipps*», «Til:» o.l.) med et kjent fornavn
+    og har ingen firmaord. Brukes der en feil gjetning ville skjule noe, f.eks. abonnementer."""
+    rest = TERMINAL_PREFIX.sub("", PERSON_PREFIX.sub("", text, count=1), count=1)
+    words = re.findall(r"[A-Za-zÆØÅæøåÀ-ÿ'-]+", rest.lower())
+    return bool(words) and words[0] in FIRST_NAMES and not any(w in BUSINESS for w in words)
+
+
 def contains_person(text: str) -> bool:
     return "Person " in text or "Deg selv" in text

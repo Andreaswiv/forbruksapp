@@ -179,6 +179,9 @@ def match_category(text: str, amount: float, rules: list[Rule]) -> str | None:
 
 def categorize(text: str, amount: float, rules: list[Rule]) -> str:
     cat = match_category(text, amount, rules)
+    if cat == "Annet" and amount > 0:
+        # «Annet» er en sekk for utgifter – penger inn fra samme sted er nesten alltid inntekt, ikke refusjon
+        return "Inntekt annet"
     if cat:
         return cat
     return "Inntekt annet" if amount > 0 else "Ukategorisert"
