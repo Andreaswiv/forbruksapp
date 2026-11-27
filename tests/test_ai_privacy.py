@@ -161,8 +161,20 @@ def test_connect_keeps_other_settings(tmp_path):
     claude_connect.connect(cfg)
     data = json.loads(cfg.read_text())
     assert data["preferences"] == {"x": 1} and "annen" in data["mcpServers"]
-    assert data["mcpServers"]["forbruksapp"]["args"][0].endswith("mcp_server.py")
+    assert data["mcpServers"]["forbruksapp"]["args"][-1].endswith("mcp_server.py")
     assert claude_connect.is_connected(cfg)
     assert (tmp_path / "claude_desktop_config.json.bak").exists()
     claude_connect.disconnect(cfg)
     assert not claude_connect.is_connected(cfg) and "annen" in json.loads(cfg.read_text())["mcpServers"]
+
+
+def test_finds_claude_app_installed_as_windows_package(tmp_path, monkeypatch):
+    """Claude fra claude.ai/download på Windows (MSIX) har innstillingene i en egen pakkemappe."""
+    local, roaming = tmp_path / "Local", tmp_path / "Roaming"
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    monkeypatch.setenv("APPDATA", str(roaming))
+    assert not claude_connect._windows_app_installed()
+    pkg = local / "Packages" / "Claude_pzs8sxrjxfjjc" / "LocalCache" / "Roaming" / "Claude"
+    pkg.mkdir(parents=True)
+    assert claude_connect._windows_app_installed()
+    assert claude_connect._windows_config_dirs()[0] == pkg

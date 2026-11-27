@@ -14,20 +14,51 @@ NAME = "forbruksapp"
 SERVER = config.PROJECT_DIR / "mcp_server.py"
 
 
+def _windows_config_dirs() -> list[Path]:
+    """Mulige mapper for Claude-appens innstillinger på Windows.
+
+    Installert fra claude.ai/download (MSIX/Microsoft Store-pakke) skriver appen til en egen
+    pakkemappe under %LOCALAPPDATA%\\Packages, ikke til %APPDATA%\\Claude."""
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    roaming = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    packaged = sorted(local.glob("Packages/Claude_*/LocalCache/Roaming/Claude"))
+    packaged += sorted(local.glob("Packages/AnthropicPBC.Claude*/LocalCache/Roaming/Claude"))
+    return packaged + [roaming / "Claude"]
+
+
+def _windows_app_installed() -> bool:
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    return (any(d.exists() for d in _windows_config_dirs()) or (local / "AnthropicClaude").exists()
+            or any(local.glob("Packages/Claude_*")) or any(local.glob("Packages/AnthropicPBC.Claude*")))
+
+
 def desktop_config_path() -> Path:
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
     if os.name == "nt":
-        return Path(os.environ.get("APPDATA", Path.home())) / "Claude" / "claude_desktop_config.json"
+        dirs = _windows_config_dirs()
+        # Bruk den mappen appen faktisk bruker (finnes allerede), ellers pakkemappen, ellers %APPDATA%
+        folder = next((d for d in dirs if d.exists()), dirs[0])
+        return folder / "claude_desktop_config.json"
     return Path.home() / ".config" / "Claude" / "claude_desktop_config.json"
 
 
 def desktop_installed() -> bool:
+    if os.name == "nt":
+        return _windows_app_installed()
     return desktop_config_path().parent.exists()
 
 
+def _python() -> str:
+    """Claude starter appens MCP-server selv – den trenger vanlig python.exe (pythonw har ingen stdin/stdout)."""
+    exe = Path(sys.executable)
+    if exe.name.lower() == "pythonw.exe" and (exe.parent / "python.exe").exists():
+        return str(exe.parent / "python.exe")
+    return str(exe)
+
+
 def server_entry() -> dict:
-    entry = {"command": sys.executable, "args": [str(SERVER)]}
+    entry = {"command": _python(), "args": ["-X", "utf8", str(SERVER)]}
     if os.environ.get("FORBRUKSAPP_DIR"):
         entry["env"] = {"FORBRUKSAPP_DIR": str(config.DATA_DIR)}
     return entry
@@ -70,4 +101,5 @@ def disconnect(path: Path | None = None) -> None:
 def claude_code_command() -> str:
     e = server_entry()
     env = "".join(f" -e {k}={shlex.quote(v)}" for k, v in e.get("env", {}).items())
-    return f"claude mcp add {NAME} --scope user{env} -- {shlex.quote(e['command'])} {shlex.quote(e['args'][0])}"
+    args = " ".join(shlex.quote(a) for a in e["args"])
+    return f"claude mcp add {NAME} --scope user{env} -- {shlex.quote(e['command'])} {args}"
